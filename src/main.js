@@ -153,10 +153,9 @@ function initBaseMessageHandlers() {
 
     for (const guild of mainGuilds) {
       let member = guild.members.get(msg.author.id);
-
       if (! member) {
         try {
-          member = await bot.getRESTGuildMember(guild.id, user.id);
+          member = await bot.getRESTGuildMember(guild.id, msg.author.id);
         } catch (e) {
           continue;
         }
@@ -172,7 +171,7 @@ function initBaseMessageHandlers() {
     });
 	
 	if(!isVerified) {
-		return bot.createMessage(msg.channel.id, "You must verify at <#978741873906696192> first to open a ticket. If you cannot do that for some reason, you may email me `william@nelsoncybersecurity.com`");
+		return bot.createMessage(msg.channel.id, "You must verify at <#978741873906696192> first to open a ticket. If you cannot do that for some reason, please message <@431273657961283614> or <@697678869167341639> and ask them for help.");
 	}
 	
 	// check if user verified end
