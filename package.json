@@ -13,7 +13,8 @@
     "generate-config-jsdoc": "node src/data/generateCfgJsdoc.js",
     "generate-plugin-api-docs": "jsdoc2md -t docs/plugin-api-template.hbs src/pluginApi.js > docs/plugin-api.md",
     "create-migration": "knex migrate:make",
-    "run-migrations": "knex migrate:latest"
+    "run-migrations": "knex migrate:latest",
+    "nodemon": "nodemon src/index.js"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,7 @@
   },
   "dependencies": {
     "ajv": "^6.12.4",
+    "common-tags": "^1.8.2",
     "eris": "https://github.com/Dragory/eris/archive/0.14.0-stage-hotfix.tar.gz",
     "express": "^4.17.1",
     "helmet": "^4.1.1",
@@ -33,6 +35,7 @@
     "moment": "^2.27.0",
     "mv": "^2.1.1",
     "mysql2": "^2.1.0",
+    "nodemon": "^2.0.20",
     "pacote": "^11.1.11",
     "pm2": "^5.2.0",
     "public-ip": "^4.0.2",

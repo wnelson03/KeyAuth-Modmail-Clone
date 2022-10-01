@@ -4,7 +4,7 @@ const path = require("path");
 const config = require("./cfg");
 const bot = require("./bot");
 const knex = require("./knex");
-const {messageQueue} = require("./queue");
+const { messageQueue } = require("./queue");
 const utils = require("./utils");
 const { createCommandManager } = require("./commands");
 const { getPluginAPI, installPlugins, loadPlugins } = require("./plugins");
@@ -14,7 +14,15 @@ const blocked = require("./data/blocked");
 const threads = require("./data/threads");
 const updates = require("./data/updates");
 
-const {ACCIDENTAL_THREAD_MESSAGES} = require("./data/constants");
+const { ACCIDENTAL_THREAD_MESSAGES } = require("./data/constants");
+const {
+  NeedsToBeVerified,
+  VerifyRole,
+  BannedFromTickets,
+  IgnoreAccidentalThreads,
+  AutoReplyToUser,
+  UserEditMsg,
+} = require("./monkie/reponses");
 
 module.exports = {
   async start() {
@@ -26,20 +34,30 @@ module.exports = {
     bot.once("ready", async () => {
       console.log("Connected! Waiting for servers to become available...");
 
-      await (new Promise(resolve => {
+      await new Promise((resolve) => {
         const waitNoteTimeout = setTimeout(() => {
-          console.log("Servers did not become available after 15 seconds, continuing start-up anyway");
+          console.log(
+            "Servers did not become available after 15 seconds, continuing start-up anyway"
+          );
           console.log("");
 
-          const isSingleServer = config.mainServerId.includes(config.inboxServerId);
+          const isSingleServer = config.mainServerId.includes(
+            config.inboxServerId
+          );
           if (isSingleServer) {
-            console.log("WARNING: The bot will not work before it's invited to the server.");
+            console.log(
+              "WARNING: The bot will not work before it's invited to the server."
+            );
           } else {
             const hasMultipleMainServers = config.mainServerId.length > 1;
             if (hasMultipleMainServers) {
-              console.log("WARNING: The bot will not function correctly until it's invited to *all* main servers and the inbox server.");
+              console.log(
+                "WARNING: The bot will not function correctly until it's invited to *all* main servers and the inbox server."
+              );
             } else {
-              console.log("WARNING: The bot will not function correctly until it's invited to *both* the main server and the inbox server.");
+              console.log(
+                "WARNING: The bot will not function correctly until it's invited to *both* the main server and the inbox server."
+              );
             }
           }
 
@@ -49,13 +67,13 @@ module.exports = {
         }, 15 * 1000);
 
         Promise.all([
-          ...config.mainServerId.map(id => waitForGuild(id)),
+          ...config.mainServerId.map((id) => waitForGuild(id)),
           waitForGuild(config.inboxServerId),
         ]).then(() => {
           clearTimeout(waitNoteTimeout);
           resolve();
         });
-      }));
+      });
 
       console.log("Initializing...");
       initStatus();
@@ -64,7 +82,9 @@ module.exports = {
 
       console.log("Loading plugins...");
       const pluginResult = await loadAllPlugins();
-      console.log(`Loaded ${pluginResult.loadedCount} plugins (${pluginResult.baseCount} built-in plugins, ${pluginResult.externalCount} external plugins)`);
+      console.log(
+        `Loaded ${pluginResult.loadedCount} plugins (${pluginResult.baseCount} built-in plugins, ${pluginResult.externalCount} external plugins)`
+      );
 
       console.log("");
       console.log("Done! Now listening to DMs.");
@@ -72,7 +92,7 @@ module.exports = {
     });
 
     bot.connect();
-  }
+  },
 };
 
 function waitForGuild(guildId) {
@@ -80,8 +100,8 @@ function waitForGuild(guildId) {
     return Promise.resolve();
   }
 
-  return new Promise(resolve => {
-    bot.on("guildAvailable", guild => {
+  return new Promise((resolve) => {
+    bot.on("guildAvailable", (guild) => {
       if (guild.id === guildId) {
         resolve();
       }
@@ -91,15 +111,21 @@ function waitForGuild(guildId) {
 
 function initStatus() {
   function applyStatus() {
-    const type = {
-      "playing": 0,
-      "watching": 3,
-      "listening": 2,
-    }[config.statusType] || 0;
-    bot.editStatus(null, {name: config.status, type});
+    const type =
+      {
+        playing: 0,
+        watching: 3,
+        listening: 2,
+      }[config.statusType] || 0;
+    bot.editStatus(null, { name: config.status, type });
   }
 
-  if (config.status == null || config.status === "" || config.status === "none" || config.status === "off") {
+  if (
+    config.status == null ||
+    config.status === "" ||
+    config.status === "none" ||
+    config.status === "off"
+  ) {
     return;
   }
 
@@ -114,21 +140,30 @@ function initBaseMessageHandlers() {
    * 1) If alwaysReply is enabled, reply to the user
    * 2) If alwaysReply is disabled, save that message as a chat message in the thread
    */
-  bot.on("messageCreate", async msg => {
-    if (! utils.messageIsOnInboxServer(msg)) return;
+  bot.on("messageCreate", async (msg) => {
+    if (!utils.messageIsOnInboxServer(msg)) return;
     if (msg.author.id === bot.user.id) return;
 
     const thread = await threads.findByChannelId(msg.channel.id);
-    if (! thread) return;
+    if (!thread) return;
 
-    if (! msg.author.bot && (msg.content.startsWith(config.prefix) || msg.content.startsWith(config.snippetPrefix))) {
+    if (
+      !msg.author.bot &&
+      (msg.content.startsWith(config.prefix) ||
+        msg.content.startsWith(config.snippetPrefix))
+    ) {
       // Save commands as "command messages"
       thread.saveCommandMessageToLogs(msg);
-    } else if (! msg.author.bot && config.alwaysReply) {
+    } else if (!msg.author.bot && config.alwaysReply) {
       // AUTO-REPLY: If config.alwaysReply is enabled, send all chat messages in thread channels as replies
-      if (! utils.isStaff(msg.member)) return; // Only staff are allowed to reply
+      if (!utils.isStaff(msg.member)) return; // Only staff are allowed to reply
 
-      const replied = await thread.replyToUser(msg.member, msg.content.trim(), msg.attachments, config.alwaysReplyAnon || false);
+      const replied = await thread.replyToUser(
+        msg.member,
+        msg.content.trim(),
+        msg.attachments,
+        config.alwaysReplyAnon || false
+      );
       if (replied) msg.delete();
     } else {
       // Otherwise just save the messages as "chat" in the logs
@@ -141,19 +176,18 @@ function initBaseMessageHandlers() {
    * 1) Find the open modmail thread for this user, or create a new one
    * 2) Post the message as a user reply in the thread
    */
-  bot.on("messageCreate", async msg => {
-    if (! (msg.channel instanceof Eris.PrivateChannel)) return;
+  bot.on("messageCreate", async (msg) => {
+    if (!(msg.channel instanceof Eris.PrivateChannel)) return;
     if (msg.author.bot) return;
     if (msg.type !== 0) return; // Ignore pins etc.
-	
-	
-	// check if user verified start
-	const mainGuilds = utils.getMainGuilds();
+
+    // check if user verified start
+    const mainGuilds = utils.getMainGuilds();
     const userGuildData = new Map();
 
     for (const guild of mainGuilds) {
       let member = guild.members.get(msg.author.id);
-      if (! member) {
+      if (!member) {
         try {
           member = await bot.getRESTGuildMember(guild.id, msg.author.id);
         } catch (e) {
@@ -165,29 +199,45 @@ function initBaseMessageHandlers() {
         userGuildData.set(guild.id, { guild, member });
       }
     }
-	
-	const isVerified = userGuildData.size === 0 || Array.from(userGuildData.values()).some(({guild, member}) => {
-        return member.roles.includes('965748924826665010');
-    });
-	
-	if(!isVerified) {
-		return bot.createMessage(msg.channel.id, "You must verify at <#978741873906696192> first to open a ticket. If you cannot do that for some reason, please message <@431273657961283614> or <@697678869167341639> and ask them for help.");
-	}
-	
-	// check if user verified end
 
+    const isVerified =
+      userGuildData.size === 0 ||
+      Array.from(userGuildData.values()).some(({ guild, member }) => {
+        return member.roles.includes(VerifyRole);
+      });
 
-    if (await blocked.isBlocked(msg.author.id)) return bot.createMessage(msg.channel.id, "You've been blocked from creating tickets. Message <@431273657961283614> or another admin if you feel you were wrongly blocked.");
+    if (!isVerified) {
+      return bot.createMessage(
+        msg.channel.id,
+        NeedsToBeVerified(msg.author.id)
+      );
+    }
+
+    // check if user verified end
+
+    if (await blocked.isBlocked(msg.author.id))
+      return bot.createMessage(
+        msg.channel.id,
+        BannedFromTickets(msg.author.id)
+      );
 
     // Private message handling is queued so e.g. multiple message in quick succession don't result in multiple channels being created
     messageQueue.add(async () => {
       let thread = await threads.findOpenThreadByUserId(msg.author.id);
-      const createNewThread = (thread == null);
+      const createNewThread = thread == null;
 
       // New thread
       if (createNewThread) {
         // Ignore messages that shouldn't usually open new threads, such as "ok", "thanks", etc.
-        if (config.ignoreAccidentalThreads && msg.content && ACCIDENTAL_THREAD_MESSAGES.includes(msg.content.trim().toLowerCase())) return bot.createMessage(msg.channel.id, "A ticket wasn't created because your message contains typical accidental phrases such as `ok` and `thanks`");
+        if (
+          config.ignoreAccidentalThreads &&
+          msg.content &&
+          ACCIDENTAL_THREAD_MESSAGES.includes(msg.content.trim().toLowerCase())
+        )
+          return bot.createMessage(
+            msg.channel.id,
+            IgnoreAccidentalThreads(msg.author.id)
+          );
 
         thread = await threads.createNewThreadForUser(msg.author, {
           source: "dm",
@@ -201,9 +251,11 @@ function initBaseMessageHandlers() {
         if (createNewThread) {
           // Send auto-reply to the user
           if (config.responseMessage) {
-            const responseMessage = utils.readMultilineConfigValue(config.responseMessage);
+            const responseMessage = utils.readMultilineConfigValue(
+              config.responseMessage
+            );
 
-            bot.createMessage(msg.channel.id, "Thank you for your message! Please be patient while support assists you.\n\nIf your question is about KeyAuth examples or website, please do `.close` and create topic on https://community.keyauth.cc/\n\n**Tickets are only for account issues/purchase questions. Your ticket will be closed without an answer if you make a ticket for any other reason.**\n\nAlso, make sure you state what you need help with right away. Just saying \"help\" and not saying anything further is useless to us and will result in us closing the ticket without assisting you.\n\nIf you lost access or forgot your email, try using <https://keyauth.win/newEmail/> if that doesn't work, send us the following: screenshot of this website <https://wtfismyip.com>, your KeyAuth username, and the new email you want.");
+            bot.createMessage(msg.channel.id, AutoReplyToUser(msg.author.id));
           }
         }
       }
@@ -216,31 +268,38 @@ function initBaseMessageHandlers() {
    * 2) If that message was moderator chatter in the thread, update the corresponding chat message in the DB
    */
   bot.on("messageUpdate", async (msg, oldMessage) => {
-    if (! msg || ! msg.author) return;
+    if (!msg || !msg.author) return;
     if (msg.author.id === bot.user.id) return;
     if (await blocked.isBlocked(msg.author.id)) return;
-    if (! msg.content) return;
+    if (!msg.content) return;
 
     // Old message content doesn't persist between bot restarts
-    const oldContent = oldMessage && oldMessage.content || "*Unavailable due to bot restart*";
+    const oldContent =
+      (oldMessage && oldMessage.content) || "*Unavailable due to bot restart*";
     const newContent = msg.content;
 
     // Ignore edit events with changes only in embeds etc.
     if (newContent.trim() === oldContent.trim()) return;
 
     // 1) If this edit was in DMs
-    if (! msg.author.bot && msg.channel instanceof Eris.PrivateChannel) {
+    if (!msg.author.bot && msg.channel instanceof Eris.PrivateChannel) {
       const thread = await threads.findOpenThreadByUserId(msg.author.id);
-      if (! thread) return;
+      if (!thread) return;
 
-      const editMessage = utils.disableLinkPreviews(`**The user edited their message:**\n\`B:\` ${oldContent}\n\`A:\` ${newContent}`);
+      const editMessage = UserEditMsg(
+        utils.disableLinkPreviews(oldContent),
+        utils.disableLinkPreviews(newContent)
+      );
       thread.postSystemMessage(editMessage);
     }
 
     // 2) If this edit was a chat message in the thread
-    else if (utils.messageIsOnInboxServer(msg) && (msg.author.bot || utils.isStaff(msg.member))) {
+    else if (
+      utils.messageIsOnInboxServer(msg) &&
+      (msg.author.bot || utils.isStaff(msg.member))
+    ) {
       const thread = await threads.findOpenThreadByChannelId(msg.channel.id);
-      if (! thread) return;
+      if (!thread) return;
 
       thread.updateChatMessageInLogs(msg);
     }
@@ -249,14 +308,14 @@ function initBaseMessageHandlers() {
   /**
    * When a staff message is deleted in a modmail thread, delete it from the database as well
    */
-  bot.on("messageDelete", async msg => {
-    if (! msg.author) return;
+  bot.on("messageDelete", async (msg) => {
+    if (!msg.author) return;
     if (msg.author.id === bot.user.id) return;
-    if (! utils.messageIsOnInboxServer(msg)) return;
-    if (! msg.author.bot && ! utils.isStaff(msg.member)) return;
+    if (!utils.messageIsOnInboxServer(msg)) return;
+    if (!msg.author.bot && !utils.isStaff(msg.member)) return;
 
     const thread = await threads.findOpenThreadByChannelId(msg.channel.id);
-    if (! thread) return;
+    if (!thread) return;
 
     thread.deleteChatMessageFromLogs(msg.id);
   });
@@ -264,9 +323,9 @@ function initBaseMessageHandlers() {
   /**
    * When the bot is mentioned on the main server, ping staff in the log channel about it
    */
-  bot.on("messageCreate", async msg => {
-    if (! utils.messageIsOnMainServer(msg)) return;
-    if (! msg.mentions.some(user => user.id === bot.user.id)) return;
+  bot.on("messageCreate", async (msg) => {
+    if (!utils.messageIsOnMainServer(msg)) return;
+    if (!msg.mentions.some((user) => user.id === bot.user.id)) return;
     if (msg.author.bot) return;
 
     if (utils.messageIsOnInboxServer(msg)) {
@@ -283,16 +342,18 @@ function initBaseMessageHandlers() {
 
     let content;
     const mainGuilds = utils.getMainGuilds();
-    const staffMention = (config.pingOnBotMention ? utils.getInboxMention() : "");
-    const allowedMentions = (config.pingOnBotMention ? utils.getInboxMentionAllowedMentions() : undefined);
+    const staffMention = config.pingOnBotMention ? utils.getInboxMention() : "";
+    const allowedMentions = config.pingOnBotMention
+      ? utils.getInboxMentionAllowedMentions()
+      : undefined;
 
     const userMentionStr = `**${msg.author.username}#${msg.author.discriminator}** (\`${msg.author.id}\`)`;
     const messageLink = `https:\/\/discordapp.com\/channels\/${msg.channel.guild.id}\/${msg.channel.id}\/${msg.id}`;
 
     if (mainGuilds.length === 1) {
-        content = `${staffMention}Bot mentioned in ${msg.channel.mention} by ${userMentionStr}: "${msg.cleanContent}"\n\n<${messageLink}>`;
+      content = `${staffMention}Bot mentioned in ${msg.channel.mention} by ${userMentionStr}: "${msg.cleanContent}"\n\n<${messageLink}>`;
     } else {
-        content = `${staffMention}Bot mentioned in ${msg.channel.mention} (${msg.channel.guild.name}) by ${userMentionStr}: "${msg.cleanContent}"\n\n<${messageLink}>`;
+      content = `${staffMention}Bot mentioned in ${msg.channel.mention} (${msg.channel.guild.name}) by ${userMentionStr}: "${msg.cleanContent}"\n\n<${messageLink}>`;
     }
 
     bot.createMessage(utils.getLogChannel().id, {
@@ -302,17 +363,28 @@ function initBaseMessageHandlers() {
 
     // Send an auto-response to the mention, if enabled
     if (config.botMentionResponse) {
-      const botMentionResponse = utils.readMultilineConfigValue(config.botMentionResponse);
-      bot.createMessage(msg.channel.id, botMentionResponse.replace(/{userMention}/g, `<@${msg.author.id}>`));
+      const botMentionResponse = utils.readMultilineConfigValue(
+        config.botMentionResponse
+      );
+      bot.createMessage(
+        msg.channel.id,
+        botMentionResponse.replace(/{userMention}/g, `<@${msg.author.id}>`)
+      );
     }
 
     // If configured, automatically open a new thread with a user who has pinged it
     if (config.createThreadOnMention) {
-      const existingThread = await threads.findOpenThreadByUserId(msg.author.id);
-      if (! existingThread) {
+      const existingThread = await threads.findOpenThreadByUserId(
+        msg.author.id
+      );
+      if (!existingThread) {
         // Only open a thread if we don't already have one
-        const createdThread = await threads.createNewThreadForUser(msg.author, { quiet: true });
-        await createdThread.postSystemMessage(`This thread was opened from a bot mention in <#${msg.channel.id}>`);
+        const createdThread = await threads.createNewThreadForUser(msg.author, {
+          quiet: true,
+        });
+        await createdThread.postSystemMessage(
+          `This thread was opened from a bot mention in <#${msg.channel.id}>`
+        );
         await createdThread.receiveUserReply(msg);
       }
     }
